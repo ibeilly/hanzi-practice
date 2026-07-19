@@ -64,6 +64,7 @@ docker buildx create --name multiarch --use 2>/dev/null || docker buildx use mul
 # 推送到镜像仓库（多平台需 --push；--load 只能装载单一平台）
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
+  --provenance=false --sbom=false \
   -t ghcr.io/<owner>/hanzi-practice:latest \
   --push .
 ```

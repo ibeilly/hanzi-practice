@@ -56,5 +56,8 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # 关闭 attestation，避免 GHCR 出现 unknown/unknown 平台条目
+          provenance: false
+          sbom: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
