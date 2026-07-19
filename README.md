@@ -2,6 +2,8 @@
 
 基于常用规范字形笔顺数据的网页练习工具：支持输入词语、教育部《通用规范汉字表》快速选字、田字格笔顺动画、拼音与朗读。
 
+**在线演示：** [https://ibeilly.github.io/hanzi-practice/](https://ibeilly.github.io/hanzi-practice/)
+
 ## 功能
 
 - **笔顺动画**：田字格 + 灰色底稿，逐笔演示
@@ -80,15 +82,23 @@ docker buildx build --platform linux/arm64 -t hanzi-practice:local --load .
 
 ## GitHub Pages
 
-推送到 `main` 时，[`.github/workflows/pages.yml`](.github/workflows/pages.yml) 会构建静态站点并部署。
+线上地址：https://ibeilly.github.io/hanzi-practice/
 
-首次使用请在仓库 **Settings → Pages → Build and deployment → Source** 选择 **GitHub Actions**。
+推送到 `main` 时，[`.github/workflows/pages.yml`](.github/workflows/pages.yml) 会自动构建并部署最新静态站点（与 Docker 镜像构建相互独立）。
 
-站点地址一般为：
+### 首次启用
 
-`https://<owner>.github.io/hanzi-practice/`
+1. 打开仓库 **Settings → Pages**
+2. **Build and deployment → Source** 选择 **GitHub Actions**（不要选 Deploy from a branch）
+3. 到 **Actions → Pages** 确认工作流成功；若此前失败过，可对最新 run 点 **Re-run all jobs**
 
-说明：Pages 为纯静态托管，无 `/api/tts` 代理，朗读会回退到有道单字发音；完整女声 TTS 请用 Docker / `npm start`。
+无需配置分支 / `docs` 目录；站点由 Actions 直接发布。
+
+### 说明
+
+- 构建时使用 `VITE_BASE=/hanzi-practice/`，资源路径适配项目站子目录。
+- Pages 为纯静态托管，无 `/api/tts` 代理，朗读会回退到有道单字发音。
+- 需要完整女声 TTS 时，请使用 Docker 或 `npm start`。
 
 ## 数据来源与说明
 
