@@ -71,5 +71,7 @@ function ttsPlugin() {
 }
 
 export default defineConfig({
+  // GitHub Pages 项目站使用 /<repo>/；Docker / 本地默认为 /
+  base: process.env.VITE_BASE || '/',
   plugins: [ttsPlugin()],
 })

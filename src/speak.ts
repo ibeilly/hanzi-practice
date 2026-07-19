@@ -65,7 +65,7 @@ function playBlob(blob: Blob, rate: number, generation: number): Promise<boolean
 
 async function playViaProxy(text: string, generation: number): Promise<boolean> {
   try {
-    const url = `/api/tts?text=${encodeURIComponent(text)}&spd=2`
+    const url = `${import.meta.env.BASE_URL}api/tts?text=${encodeURIComponent(text)}&spd=2`
     const res = await fetch(url)
     if (!res.ok) return false
     const blob = await res.blob()

@@ -78,6 +78,18 @@ docker buildx build --platform linux/arm64 -t hanzi-practice:local --load .
 
 推送到 `main` / 版本标签时，GitHub Actions（`.github/workflows/docker.yml`）会自动构建并推送双架构镜像到 GHCR。
 
+## GitHub Pages
+
+推送到 `main` 时，[`.github/workflows/pages.yml`](.github/workflows/pages.yml) 会构建静态站点并部署。
+
+首次使用请在仓库 **Settings → Pages → Build and deployment → Source** 选择 **GitHub Actions**。
+
+站点地址一般为：
+
+`https://<owner>.github.io/hanzi-practice/`
+
+说明：Pages 为纯静态托管，无 `/api/tts` 代理，朗读会回退到有道单字发音；完整女声 TTS 请用 Docker / `npm start`。
+
 ## 数据来源与说明
 
 | 内容 | 来源 |
@@ -108,8 +120,8 @@ docker buildx build --platform linux/arm64 -t hanzi-practice:local --load .
 
 ## 部署注意
 
-- **推荐**：使用 Docker / `npm start`，朗读代理可用。
-- 静态托管（如 GitHub Pages）可正常使用笔顺、拼音与汉字表；**朗读**无 `/api/tts` 时会走有道单字兜底，整句效果可能受限。
+- **推荐完整体验**：Docker / `npm start`（含朗读代理）。
+- **GitHub Pages**：笔顺、拼音、汉字表可用；朗读走有道单字兜底。
 
 ## License
 

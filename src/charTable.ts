@@ -21,7 +21,7 @@ export interface CharTableOptions {
 const PAGE_SIZE = 100
 
 export async function loadMoeCharTable(): Promise<MoeCharTable> {
-  const res = await fetch('/data/moe-characters.json')
+  const res = await fetch(`${import.meta.env.BASE_URL}data/moe-characters.json`)
   if (!res.ok) throw new Error('汉字表加载失败')
   return res.json() as Promise<MoeCharTable>
 }
