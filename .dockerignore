@@ -1,0 +1,13 @@
+node_modules
+dist
+.git
+.github
+.vscode
+.idea
+*.log
+*.md
+.env
+.env.*
+.DS_Store
+coverage
+agent-transcripts
