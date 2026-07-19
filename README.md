@@ -113,7 +113,7 @@ docker buildx build --platform linux/arm64 -t hanzi-practice:local --load .
 
 ## License
 
-建议在仓库根目录补充 `LICENSE`（例如 MIT）后再公开。
+本项目代码采用 [Apache License 2.0](./LICENSE)。
 
 第三方数据与库请遵循各自许可：
 
