@@ -5,11 +5,15 @@ import { PRESET_TEXTS, extractHanzi } from './presets'
 import { loadMoeCharTable, mountCharTable } from './charTable'
 import { speakText, stopSpeaking } from './speak'
 
-type ViewMode = 'single' | 'multi'
+interface CharReading {
+  primary: string
+  full: string
+  isPolyphone: boolean
+}
 
 interface CharSlot {
   char: string
-  reading: string
+  reading: CharReading
   writer: HanziWriter | null
   cell: HTMLElement
   frame: HTMLElement
@@ -26,42 +30,39 @@ const app = document.querySelector<HTMLDivElement>('#app')!
 app.innerHTML = `
   <header class="site-header">
     <h1 class="brand">汉字<span>笔顺</span></h1>
-    <p class="tagline">依据常用规范字形笔顺数据，支持搜索、单字与多字动画演示，田字格可随时显示或隐藏。</p>
+    <p class="tagline">依据常用规范字形笔顺数据，支持搜索与笔顺动画演示，田字格可随时显示或隐藏。</p>
   </header>
 
   <main class="stage" id="stage">
     <div class="stage-meta">
       <div>
-        <h2 class="stage-title" id="stage-title">多字动画</h2>
+        <h2 class="stage-title" id="stage-title">笔顺演示</h2>
         <p class="stage-reading" id="stage-reading"></p>
       </div>
-      <p class="stage-hint" id="stage-hint">点拼音读单字，点田字格播放笔顺</p>
+      <p class="stage-hint" id="stage-hint">点拼音读单字；点田字格播该字；播放则依次演示</p>
     </div>
     <div class="char-grid" id="char-grid"></div>
   </main>
 
-  <div class="toolbar">
-    <div class="mode-tabs" role="tablist" aria-label="展示模式">
-      <button type="button" class="mode-tab active" data-mode="multi" role="tab">多字动画</button>
-      <button type="button" class="mode-tab" data-mode="single" role="tab">单字动画</button>
-    </div>
-
-    <div class="toolbar-group" id="playback-controls" aria-label="播放控制">
+  <div class="toolbar" id="toolbar">
+    <div class="toolbar-group playback-controls" id="playback-controls" aria-label="播放控制">
       <button type="button" class="btn btn-accent" id="btn-play" aria-pressed="false">播放</button>
       <button type="button" class="btn btn-ghost" id="btn-speak" aria-pressed="false">读音</button>
       <button type="button" class="btn btn-ghost" id="btn-loop" aria-pressed="false">循环</button>
       <button type="button" class="btn btn-ghost" id="btn-stop" disabled>停止</button>
     </div>
 
-    <label class="toggle">
-      <input type="checkbox" id="toggle-grid" checked />
-      显示田字格
-    </label>
+    <div class="toolbar-options">
+      <label class="toggle">
+        <input type="checkbox" id="toggle-grid" checked />
+        <span>田字格</span>
+      </label>
 
-    <label class="speed-control">
-      速度
-      <input type="range" id="speed" min="0.5" max="2.5" step="0.25" value="1" />
-    </label>
+      <label class="speed-control">
+        <span>速度</span>
+        <input type="range" id="speed" min="0.5" max="2.5" step="0.25" value="1" />
+      </label>
+    </div>
   </div>
 
   <section class="panel" aria-label="搜索与输入">
@@ -96,22 +97,17 @@ const input = app.querySelector<HTMLInputElement>('#text-input')!
 const presetsEl = app.querySelector<HTMLDivElement>('#presets')!
 const gridEl = app.querySelector<HTMLDivElement>('#char-grid')!
 const stageEl = app.querySelector<HTMLElement>('#stage')!
-const stageTitle = app.querySelector<HTMLHeadingElement>('#stage-title')!
 const stageReading = app.querySelector<HTMLParagraphElement>('#stage-reading')!
-const stageHint = app.querySelector<HTMLParagraphElement>('#stage-hint')!
 const toggleGrid = app.querySelector<HTMLInputElement>('#toggle-grid')!
 const speedInput = app.querySelector<HTMLInputElement>('#speed')!
 const btnPlay = app.querySelector<HTMLButtonElement>('#btn-play')!
 const btnSpeak = app.querySelector<HTMLButtonElement>('#btn-speak')!
 const btnLoop = app.querySelector<HTMLButtonElement>('#btn-loop')!
 const btnStop = app.querySelector<HTMLButtonElement>('#btn-stop')!
-const modeTabs = Array.from(app.querySelectorAll<HTMLButtonElement>('.mode-tab'))
 
 type PlaybackState = 'idle' | 'playing' | 'looping' | 'speaking'
 
-let mode: ViewMode = 'multi'
 let slots: CharSlot[] = []
-let focusIndex = 0
 let animToken = 0
 let looping = false
 let strokeSpeed = 1
@@ -159,7 +155,7 @@ function updatePlaybackControls() {
   if (playbackState === 'looping') btnLoop.disabled = false
 }
 
-function getCharReading(char: string): string {
+function getCharReading(char: string): CharReading {
   const primary = pinyin(char, { toneType: 'symbol', type: 'array' })[0] ?? ''
   const all = pinyin(char, {
     toneType: 'symbol',
@@ -170,13 +166,17 @@ function getCharReading(char: string): string {
     .map((item) => item.trim())
     .filter(Boolean)
   const uniques = [...new Set(list)]
-  if (uniques.length <= 1) return primary || uniques[0] || ''
-  const rest = uniques.filter((item) => item !== primary)
-  return rest.length ? `${primary}（${rest.join(' / ')}）` : primary
+  const main = primary || uniques[0] || ''
+  const rest = uniques.filter((item) => item !== main)
+  return {
+    primary: main,
+    full: rest.length ? `${main}（${rest.join(' / ')}）` : main,
+    isPolyphone: rest.length > 0,
+  }
 }
 
 function getTextReading(chars: string[]): string {
-  return chars.map((char) => pinyin(char, { toneType: 'symbol' })).join(' ')
+  return chars.map((char) => getCharReading(char).primary).join(' ')
 }
 
 function createTianzigeSvg(size: number): SVGSVGElement {
@@ -274,11 +274,6 @@ function updateStageReading() {
     stageReading.textContent = ''
     return
   }
-  if (mode === 'single') {
-    const slot = slots[focusIndex]
-    stageReading.textContent = slot ? `${slot.char} · ${slot.reading}` : ''
-    return
-  }
   stageReading.textContent = getTextReading(slots.map((slot) => slot.char))
 }
 
@@ -288,32 +283,6 @@ function clearSlots() {
   slots = []
   gridEl.innerHTML = ''
   setPlaybackState('idle')
-}
-
-function updateModeUI() {
-  modeTabs.forEach((tab) => {
-    tab.classList.toggle('active', tab.dataset.mode === mode)
-  })
-
-  if (mode === 'single') {
-    stageTitle.textContent = '单字动画'
-    stageHint.textContent = '点拼音读单字；点田字格播放笔顺'
-  } else {
-    stageTitle.textContent = '多字动画'
-    stageHint.textContent = '点拼音读单字；点田字格播放该字；模式请用工具栏切换'
-  }
-
-  applyFocusVisibility()
-  updateStageReading()
-}
-
-function applyFocusVisibility() {
-  slots.forEach((slot, index) => {
-    const show = mode === 'multi' || index === focusIndex || slots.length === 1
-    slot.cell.style.display = show ? '' : 'none'
-    slot.cell.classList.toggle('active', mode === 'single' && index === focusIndex)
-  })
-  updateStageReading()
 }
 
 function markPlaying(index: number | null) {
@@ -331,8 +300,6 @@ function buildSlots(chars: string[]) {
     return
   }
 
-  focusIndex = Math.min(focusIndex, chars.length - 1)
-
   chars.forEach((char, index) => {
     const reading = getCharReading(char)
     const cell = document.createElement('div')
@@ -341,10 +308,17 @@ function buildSlots(chars: string[]) {
 
     const pinyinBtn = document.createElement('button')
     pinyinBtn.type = 'button'
-    pinyinBtn.className = 'char-pinyin'
-    pinyinBtn.textContent = reading
-    pinyinBtn.title = `朗读「${char}」`
-    pinyinBtn.setAttribute('aria-label', `朗读 ${char}，${reading}`)
+    pinyinBtn.className = reading.isPolyphone
+      ? 'char-pinyin is-polyphone'
+      : 'char-pinyin'
+    pinyinBtn.textContent = reading.primary
+    pinyinBtn.title = reading.isPolyphone
+      ? `朗读「${char}」· 多音 ${reading.full}`
+      : `朗读「${char}」`
+    pinyinBtn.setAttribute(
+      'aria-label',
+      `朗读 ${char}，${reading.full}`,
+    )
 
     const svg = createTianzigeSvg(CELL_SIZE)
     const frame = document.createElement('button')
@@ -375,23 +349,16 @@ function buildSlots(chars: string[]) {
 
     pinyinBtn.addEventListener('click', (e) => {
       e.stopPropagation()
-      focusIndex = index
-      if (mode === 'single') updateStageReading()
-      else {
-        stageReading.textContent = `${char} · ${reading}`
-      }
-      speakText(char)
+      stageReading.textContent = `${char} · ${reading.full}`
+      void speakText(char)
     })
 
     frame.addEventListener('click', () => {
-      focusIndex = index
-      if (mode === 'single') applyFocusVisibility()
-      else stageReading.textContent = `${char} · ${reading}`
+      stageReading.textContent = `${char} · ${reading.full}`
       void playIndices([index])
     })
   })
 
-  applyFocusVisibility()
   updateStageReading()
   updatePlaybackControls()
 }
@@ -429,15 +396,13 @@ async function playSequence(indices: number[], token: number) {
     if (!slot) continue
 
     markPlaying(index)
-    focusIndex = index
-    if (mode === 'single') updateStageReading()
-    else stageReading.textContent = `${slot.char} · ${slot.reading}`
+    stageReading.textContent = `${slot.char} · ${slot.reading.full}`
     void speakText(slot.char)
     const ok = await animateSlot(slot, token)
     if (!ok) return
   }
   markPlaying(null)
-  if (mode === 'multi') updateStageReading()
+  updateStageReading()
 }
 
 async function playIndices(indices: number[]) {
@@ -459,10 +424,7 @@ async function playCurrent() {
     stopPlay()
     return
   }
-
-  const indices =
-    mode === 'single' ? [focusIndex] : slots.map((_, i) => i)
-  await playIndices(indices)
+  await playIndices(slots.map((_, i) => i))
 }
 
 async function loopPlay() {
@@ -477,9 +439,10 @@ async function loopPlay() {
   setPlaybackState('looping')
 
   while (looping && token === animToken) {
-    const indices =
-      mode === 'single' ? [focusIndex] : slots.map((_, i) => i)
-    await playSequence(indices, token)
+    await playSequence(
+      slots.map((_, i) => i),
+      token,
+    )
     if (!looping || token !== animToken) break
     await new Promise((r) => setTimeout(r, 450))
   }
@@ -508,11 +471,7 @@ async function speakCurrent() {
 
   setPlaybackState('speaking')
   try {
-    if (mode === 'single') {
-      await speakText(slots[focusIndex]?.char ?? '')
-    } else {
-      await speakText(slots.map((slot) => slot.char).join(''))
-    }
+    await speakText(slots.map((slot) => slot.char).join(''))
   } finally {
     // 朗读结束且未被播放/循环接管时回到空闲
     if (playbackState !== 'playing' && playbackState !== 'looping') {
@@ -557,13 +516,6 @@ form.addEventListener('submit', (e) => {
   showText(value)
 })
 
-modeTabs.forEach((tab) => {
-  tab.addEventListener('click', () => {
-    mode = (tab.dataset.mode as ViewMode) || 'multi'
-    updateModeUI()
-  })
-})
-
 toggleGrid.addEventListener('change', () => {
   stageEl.classList.toggle('hide-grid', !toggleGrid.checked)
 })
@@ -579,9 +531,6 @@ btnStop.addEventListener('click', () => stopPlay())
 updatePlaybackControls()
 
 function selectFromTable(text: string) {
-  mode = text.length > 1 ? 'multi' : 'single'
-  focusIndex = 0
-  updateModeUI()
   renderPresets()
   showText(text)
 }
@@ -606,6 +555,5 @@ async function initCharTable() {
 }
 
 renderPresets(DEFAULT_TEXT)
-updateModeUI()
 showText(DEFAULT_TEXT)
 void initCharTable()
